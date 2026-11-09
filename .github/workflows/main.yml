@@ -1,0 +1,92 @@
+from pathlib import Path
+
+html = r'''<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Ilha do Vulcão — Sobrevivência 3D</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07131b;font-family:system-ui;color:white;touch-action:none}
+#hud{position:fixed;top:10px;left:10px;z-index:3;background:#07131bcc;padding:10px 12px;border:1px solid #ffffff35;border-radius:12px;max-width:min(85vw,440px);font-size:13px;line-height:1.4}
+#msg{color:#ffe08a;font-weight:700;margin-top:5px}
+#help{position:fixed;right:10px;top:10px;background:#07131bcc;border:1px solid #ffffff35;border-radius:12px;padding:9px;font-size:12px;max-width:160px}
+#cross{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);font-size:24px;color:#fff9;pointer-events:none}
+#controls{position:fixed;bottom:16px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:end;z-index:4;pointer-events:none}
+.pad{display:grid;grid-template-columns:48px 48px 48px;grid-template-rows:48px 48px 48px;gap:4px;pointer-events:auto}
+button{border:1px solid #ffffff70;background:#07131bbb;color:white;border-radius:12px;font-size:18px;touch-action:none}
+.pad button{width:48px;height:48px}
+#actions{display:flex;gap:8px;pointer-events:auto;align-items:end}
+#actions button{padding:13px 12px;font-size:13px;font-weight:700}
+#look{position:fixed;inset:0 0 0 42%;z-index:2;touch-action:none}
+@media(min-width:850px){#controls{display:none}#help{max-width:250px}}
+</style>
+</head>
+<body>
+<div id="hud"><b>ILHA DO VULCÃO</b><div id="stats">Vida: 100 | Peças do barco: 0/5 | Munição: 12</div><div id="objective">Objetivo: encontre 5 peças e construa o barco na praia.</div><div id="msg">O avião caiu! Você sobreviveu...</div></div>
+<div id="help">WASD: andar<br>Mouse: olhar<br>Espaço: pular<br>E: coletar / conversar<br>F: usar arma<br>Chegue ao barco na praia!</div>
+<div id="cross">+</div><div id="look"></div>
+<div id="controls">
+ <div class="pad">
+  <button style="grid-column:2;grid-row:1" data-key="w">▲</button>
+  <button style="grid-column:1;grid-row:2" data-key="a">◀</button>
+  <button style="grid-column:2;grid-row:2" data-key="s">▼</button>
+  <button style="grid-column:3;grid-row:2" data-key="d">▶</button>
+  <button style="grid-column:1;grid-row:3" data-key=" " >⤒</button>
+ </div>
+ <div id="actions"><button id="collect">COLETAR</button><button id="shoot">ATIRAR</button></div>
+</div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x87c8e8); scene.fog=new THREE.Fog(0x87c8e8,45,170);
+const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,300);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.body.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xc8eaff,0x4b5735,2));
+const sun=new THREE.DirectionalLight(0xffefcf,3);sun.position.set(-35,60,25);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);scene.add(sun);
+const mat=(c,r=.9)=>new THREE.MeshStandardMaterial({color:c,roughness:r});
+const sand=mat(0xd9c18a),grass=mat(0x397b42),rock=mat(0x65635d),dark=mat(0x292d32),metal=mat(0x9aa5a9,.45),wood=mat(0x81512b),leaf=mat(0x176b43),red=mat(0xa83324);
+function box(x,y,z,sx,sy,sz,m){let o=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),m);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;scene.add(o);return o}
+function sphere(x,y,z,r,m){let o=new THREE.Mesh(new THREE.SphereGeometry(r,16,12),m);o.position.set(x,y,z);o.castShadow=true;scene.add(o);return o}
+const ground=new THREE.Mesh(new THREE.CircleGeometry(90,96),sand);ground.rotation.x=-Math.PI/2;ground.position.y=-.15;ground.receiveShadow=true;scene.add(ground);
+const island=new THREE.Mesh(new THREE.CircleGeometry(58,80),grass);island.rotation.x=-Math.PI/2;island.position.y=-.05;scene.add(island);
+const sea=new THREE.Mesh(new THREE.CircleGeometry(130,96),new THREE.MeshStandardMaterial({color:0x167caa,roughness:.3}));sea.rotation.x=-Math.PI/2;sea.position.y=-.5;scene.add(sea);
+for(let i=0;i<34;i++){let a=i*2.399,r=23+(i%7)*4,x=Math.cos(a)*r,z=Math.sin(a)*r;let trunk=new THREE.Mesh(new THREE.CylinderGeometry(.18,.28,2.5,7),wood);trunk.position.set(x,1.1,z);trunk.castShadow=true;scene.add(trunk);let crown=sphere(x,2.8,z,1.5,leaf);crown.scale.set(1,1.25,1)}
+// volcano and lava
+let cone=new THREE.Mesh(new THREE.ConeGeometry(17,27,48),rock);cone.position.set(3,13,-57);cone.castShadow=true;scene.add(cone);
+let crater=sphere(3,25,-57,4.7,red);crater.scale.set(1,.25,1);
+for(let i=0;i<9;i++){let l=sphere(3+(Math.random()-.5)*7,25+Math.random()*3,-57+(Math.random()-.5)*7,.35,mat(0xff6b20));}
+for(let i=0;i<14;i++){let x=(Math.random()-.5)*24,z=-57+(Math.random()-.5)*24;let b=sphere(x,28+Math.random()*8,z,1.1,mat(0x777777));b.scale.set(1.2,1.6,1.2)}
+// wreckage
+box(-12,1,-10,10,1.1,4,metal).rotation.y=.5;box(-16,2,-9,3,2,3,dark).rotation.z=.3;box(-5,1,-14,2,1,11,metal).rotation.z=.4;
+for(let i=0;i<5;i++){let p=box(-23+i*9,.65,13+(i%2)*3,1.1,1.1,1.1,mat([0xffcc33,0x55c7ff,0xb4b4b4,0x66cc77,0xe7e7e7][i]));p.userData.part=true;p.userData.index=i;parts.push(p)}
+function tree(x,z){let t=new THREE.Mesh(new THREE.CylinderGeometry(.15,.23,2,8),wood);t.position.set(x,1,z);scene.add(t);let c=sphere(x,2.3,z,1.25,leaf)}
+// NPC survivor
+let npc=new THREE.Group();let body=new THREE.Mesh(new THREE.CapsuleGeometry(.42,.9,4,8),mat(0x315fbd));body.position.y=1.15;npc.add(body);let head=sphere(0,2,0,.34,mat(0xc88e62));npc.add(head);npc.position.set(8,0,8);scene.add(npc);
+let boat=new THREE.Group();boat.position.set(0,0,34);scene.add(boat);let hull=box(0,.35,0,5,.7,10,wood);hull.rotation.x=.04;for(let x of [-2,2])box(x,1,0,.18,1.1,9,metal);box(0,2,0,.15,2,.15,wood);let sail=new THREE.Mesh(new THREE.ConeGeometry(2,4,3),mat(0xf1e6c8));sail.position.set(0,3.2,0);sail.rotation.z=Math.PI/2;boat.add(sail);boat.visible=false;
+const parts=[]; // populated below after function declarations
+// repair parts array population (objects placed around island)
+const spots=[[-23,.7,13],[-5,.7,18],[18,.7,3],[25,.7,-15],[-29,.7,-24]];
+spots.forEach((v,i)=>{let p=box(v[0],v[1],v[2],1.1,1.1,1.1,mat([0xffcc33,0x55c7ff,0xb4b4b4,0x66cc77,0xe7e7e7][i]));p.userData.part=true});
+let collected=0,ammo=12,health=100;let enemies=[];
+for(let i=0;i<4;i++){let g=new THREE.Group();let b=new THREE.Mesh(new THREE.CapsuleGeometry(.42,.8,4,8),mat(0x762e28));b.position.y=1;g.add(b);g.position.set(-10+i*8,0,-28-(i%2)*8);scene.add(g);enemies.push({g,hp:2})}
+const player={pos:new THREE.Vector3(0,0,4),yaw:0,pitch:0,vy:0};camera.position.set(0,1.7,4);
+const keys={};addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key.toLowerCase()==='e')interact();if(e.key.toLowerCase()==='f')shoot();});addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+let locked=false;renderer.domElement.addEventListener('click',()=>{if(innerWidth>850)renderer.domElement.requestPointerLock?.()});document.addEventListener('pointerlockchange',()=>locked=document.pointerLockElement===renderer.domElement);
+document.addEventListener('mousemove',e=>{if(locked){player.yaw-=e.movementX*.002;player.pitch=Math.max(-1.2,Math.min(1.2,player.pitch-e.movementY*.002))}});
+let look=document.getElementById('look'),drag=false,lastX=0,lastY=0;look.addEventListener('pointerdown',e=>{drag=true;lastX=e.clientX;lastY=e.clientY;look.setPointerCapture(e.pointerId)});look.addEventListener('pointermove',e=>{if(drag){player.yaw-=(e.clientX-lastX)*.006;player.pitch=Math.max(-1.2,Math.min(1.2,player.pitch-(e.clientY-lastY)*.006));lastX=e.clientX;lastY=e.clientY}});look.addEventListener('pointerup',()=>drag=false);
+document.querySelectorAll('[data-key]').forEach(b=>{let k=b.dataset.key;b.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=true});['pointerup','pointercancel','pointerleave'].forEach(ev=>b.addEventListener(ev,()=>keys[k]=false))});
+document.getElementById('collect').onclick=interact;document.getElementById('shoot').onclick=shoot;
+function say(t){document.getElementById('msg').textContent=t}
+function interact(){let nearest=null,dist=4;scene.traverse(o=>{if(o.userData.part&&!o.userData.got){let d=o.position.distanceTo(player.pos);if(d<dist){dist=d;nearest=o}}});if(nearest){nearest.userData.got=true;nearest.visible=false;collected++;say('Peça recolhida! '+collected+'/5');update();return}if(npc.position.distanceTo(player.pos)<4){say('Sobrevivente: "Os saqueadores estão por perto! Pegue as peças e fuja pelo mar."');return}if(player.pos.distanceTo(boat.position)<7){if(collected>=5){boat.visible=true;say('BARCO PRONTO! Você escapou da ilha! VITÓRIA!');document.getElementById('objective').textContent='Missão concluída — você sobreviveu!'}else say('Faltam '+(5-collected)+' peças para montar o barco.');return}say('Procure peças brilhantes espalhadas pela ilha.')}
+function update(){document.getElementById('stats').textContent=`Vida: ${health} | Peças do barco: ${collected}/5 | Munição: ${ammo}`;document.getElementById('objective').textContent=collected>=5?'Volte ao barco na praia e aperte COLETAR.':'Encontre as 5 peças do barco. Cuidado com os saqueadores!'}
+function shoot(){if(ammo<=0){say('Sem munição!');return}ammo--;let dir=new THREE.Vector3(-Math.sin(player.yaw),0,-Math.cos(player.yaw));let target=null,bd=18;enemies.forEach(e=>{if(e.hp<=0)return;let v=e.g.position.clone().sub(player.pos);let d=v.length();v.y=0;v.normalize();if(d<bd&&v.dot(dir)>.88){target=e;bd=d}});if(target){target.hp--;if(target.hp<=0){scene.remove(target.g);say('Saqueador derrotado!')}else say('Acertou! Mais um disparo!')}else say('Disparo!');update()}
+function animate(){requestAnimationFrame(animate);let forward=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0),side=(keys.d?1:0)-(keys.a?1:0);let speed=keys.shift?9:5;let dx=(-Math.sin(player.yaw)*forward+Math.cos(player.yaw)*side)*speed/60,dz=(-Math.cos(player.yaw)*forward-Math.sin(player.yaw)*side)*speed/60;player.pos.x+=dx;player.pos.z+=dz;player.pos.x=Math.max(-52,Math.min(52,player.pos.x));player.pos.z=Math.max(-52,Math.min(52,player.pos.z));if(keys[' ']&&player.pos.y<=.01)player.vy=6;player.vy-=.018;player.pos.y=Math.max(0,player.pos.y+player.vy/10);if(player.pos.y===0)player.vy=0;
+camera.position.set(player.pos.x,player.pos.y+1.65,player.pos.z);camera.rotation.order='YXZ';camera.rotation.y=player.yaw;camera.rotation.x=player.pitch;
+enemies.forEach(e=>{if(e.hp>0){let v=player.pos.clone().sub(e.g.position);let d=v.length();if(d>2&&d<17){v.y=0;v.normalize();e.g.position.add(v.multiplyScalar(.018))}else if(d<=2&&Math.random()<.02){health=Math.max(0,health-5);update();say('Você foi atingido!');if(health===0)say('Você foi derrotado. Recarregue a página para tentar de novo.')}}});
+renderer.render(scene,camera)}
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+update();animate();
+</script>
+</body></html>'''
+Path("/mnt/data/ilha_do_vulcao_3d.html").write_text(html, encoding="utf-8")
+print("Jogo criado:", Path("/mnt/data/ilha_do_vulcao_3d.html").stat().st_size, "bytes")
