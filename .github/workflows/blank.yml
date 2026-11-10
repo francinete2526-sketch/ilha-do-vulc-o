@@ -39,6 +39,35 @@ jobs:
           PROJECT_DIR=$(dirname "$SETTINGS")
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
+      - name: Corrigir JavaScript do jogo
+        run: |
+          HTML="$PROJECT_DIR/app/src/main/assets/index.html"
+          if [ ! -f "$HTML" ]; then
+            echo "index.html não encontrado!"
+            exit 1
+          fi
+          python3 - "$HTML" <<'PY'
+          import sys
+          from pathlib import Path
+
+          p = Path(sys.argv[1])
+          s = p.read_text()
+
+          s = s.replace(
+              "// wreckage\n",
+              "// wreckage\nconst parts = [];\n",
+              1
+          )
+          s = s.replace(
+              "const parts=[]; // populated below after function declarations",
+              "",
+              1
+          )
+
+          p.write_text(s)
+          print("Correção aplicada!")
+          PY
+
       - name: Configurar Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
