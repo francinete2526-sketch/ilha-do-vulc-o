@@ -1,0 +1,57 @@
+
+name: Gerar APK - Ilha do Vulcao
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "*.zip"
+      - ".github/workflows/**"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+
+      - name: Preparar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Encontrar e extrair ZIP
+        run: |
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "Nenhum arquivo ZIP encontrado!"
+            exit 1
+          fi
+          mkdir -p source
+          unzip -q "$ZIP_FILE" -d source
+          SETTINGS=$(find source -name settings.gradle -print -quit)
+          if [ -z "$SETTINGS" ]; then
+            echo "settings.gradle não encontrado!"
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$SETTINGS")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Configurar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Compilar APK
+        run: |
+          cd "$PROJECT_DIR"
+          gradle assembleDebug
+
+      - name: Disponibilizar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ilha-do-Vulcao-APK
+          path: source/**/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
